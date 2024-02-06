@@ -1,17 +1,19 @@
+figure('Position',[500 200 1100 1000])
 % Initialize boids
 numBoids = 10;
 positions = rand(numBoids, 2) * 100; % 100x100 area
 velocities = randn(numBoids, 2)/10;
 idx = 1; % Calculate alignment for the first boid
-visibleRange = 10; % Boids within 10 units are considered neighbors
+visibleRange = 5; % Boids within 10 units are considered neighbors
 T = 1000;
 borderBuffer = 10;
 minVelocity = 0.5; 
 maxVelocity = 1.5;
 separationDistance = 10;
-borderDistance = 30; % Adjust as needed
-borderFollowingFactor = 0.1; % Adjust the strength of border following
-        
+borderDistance = 30; % Adjust as needed: larger val --> boids stay close to border
+borderFollowingFactor = 0.1; % Adjust the strength of border following: smaller value --> less strict
+maxHeadingChange = 10; % Adjust the threshold for heading change: smaller value --> less abrupt
+
 % Adjust these factors to control the speed
 % alignmentFactor = 0.25; % Reduce if they move too fast
 % velocityDamping = .75; % Apply damping to slow down overall speed
@@ -26,12 +28,13 @@ for t = 1:T % For each time step
         
         % Calculate the border following force
         v4 = borderFollowing(positions, i, borderDistance, borderFollowingFactor);
-    
+        v5 = smoothHeading(velocities, i, maxHeadingChange);
+
     
         % Update boid velocity and position
 %         velocities(i, :) = velocities(i, :) + v1;
 %         positions(i, :) = positions(i, :) + velocities(i, :);
-        velocities(i, :) = velocities(i, :) + v1 + v2 + v3; %* velocityDamping;
+        velocities(i, :) = velocities(i, :) + v1 + v2 + v3 + v4 + v5; %* velocityDamping;
         if norm(velocities(i, :)) < minVelocity
             velocities(i, :) = (velocities(i, :) / norm(velocities(i, :))) * minVelocity;
         end
@@ -55,7 +58,7 @@ for t = 1:T % For each time step
     end
     
     % Visualization
-    plot(positions(:, 1), positions(:, 2), 'b.');
+    plot(positions(:, 1), positions(:, 2), 'o','MarkerFaceColor',[0 0 1],'MarkerEdgeColor',[0 0 1]);
     xlim([0, 100]);
     ylim([0, 100]);
     drawnow;
@@ -123,3 +126,23 @@ function vBorderFollowing = borderFollowing(positions, idx, borderDistance, bord
     end
 end
 
+function vSmoothHeading = smoothHeading(velocities, idx, maxHeadingChange)
+    % Calculate the change in heading direction
+    currentVelocity = velocities(idx, :);
+    previousVelocity = velocities(idx, :) - [0.01, 0.01]; % Previous velocity, adjust as needed
+    
+    % Calculate the angle change between current and previous velocity
+%     angleChange = atan2d(norm(cross(currentVelocity, previousVelocity)), dot(currentVelocity, previousVelocity));
+    angleChange = atan2d(currentVelocity(1) * previousVelocity(2) - currentVelocity(2) * previousVelocity(1), ...
+        currentVelocity(1) * previousVelocity(1) + currentVelocity(2) * previousVelocity(2));
+    
+    % Check if the angle change exceeds the threshold
+    if angleChange > maxHeadingChange
+        % Gradually adjust the heading direction to smooth the change
+        targetVelocity = (currentVelocity + previousVelocity) / 2;
+        vSmoothHeading = (targetVelocity - currentVelocity) * 0.1; % Adjusting factor for smoothing
+    else
+        % No action needed if the heading change is within the threshold
+        vSmoothHeading = [0, 0];
+    end
+end
